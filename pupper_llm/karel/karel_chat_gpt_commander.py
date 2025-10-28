@@ -54,7 +54,7 @@ class Command(ABC):
 class KarelMethodCommand(Command):
     """Generic command that calls any karel.KarelPupper method by name."""
     
-    def __init__(self, method_name: str, display_name: str = None, duration: float = 1.5):
+    def __init__(self, method_name: str, display_name: str = None, arguments: list = None, duration: float = 1.5):
         """
         Args:
             method_name: The name of the method to call on KarelPupper (e.g., 'move_forward')
@@ -63,13 +63,14 @@ class KarelMethodCommand(Command):
         """
         super().__init__(display_name or method_name)
         self.method_name = method_name
+        self.arguments = arguments
         self.duration = duration
     
     async def execute(self, pupper: karel.KarelPupper) -> Tuple[bool, str]:
         try:
             # Dynamically get and call the method
             method = getattr(pupper, self.method_name)
-            method()  # Direct call - all karel methods are synchronous
+            method(*self.arguments)  # Direct call - all karel methods are synchronous
             
             # Wait for the physical action to complete
             await asyncio.sleep(self.duration)
@@ -405,7 +406,9 @@ class EnhancedGPTCommanderNode(Node):
             Don't worry about making this prompt too long - the TA version is 50 lines!
             """
             # Enhanced system prompt for better command recognition
-            system_prompt = """You are Pupper....... <complete the rest!>"""
+            system_prompt = """You are Pupper a quadruped robot dog. When I give you a prompt, I'd like you to give me back a list of commands to complete these
+            actions. Your available commands are move(linearX,linearY,angularZ), move_forward, move_backward, move_left, move_right, turn_left, turn_right, wiggl, stop. I want you to output a response of
+            simply the actions I want in the format of a comma separated list of commands. For example "move(linearX,linearY,angularZ), move_backward, wiggle, stop". Keep in mind. don't put spaces between the linear x velocity, linear y velocity, and angular z velocites for the move command, only commas. I want the exact format I gave."""
             
             messages = [{"role": "system", "content": system_prompt}] + self.conversation_history
             
@@ -510,49 +513,41 @@ class EnhancedGPTCommanderNode(Node):
     
     async def _queue_single_command(self, command_text: str) -> bool:
         """Queue a single robot command. Returns True if command was queued."""
-        # First check if there's a JSON velocity specification
-        import re
-        json_match = re.search(r'move\s*(\{[^}]+\})', command_text)
         
-        if json_match:
-            # Parse JSON velocity parameters
-            try:
-                velocity_json = json_match.group(1)
-                velocities = json.loads(velocity_json)
-                x = float(velocities.get('x', 0.0))
-                y = float(velocities.get('y', 0.0))
-                z = float(velocities.get('z', 0.0))
-                logger.info(f'Queueing generic move command: x={x}, y={y}, z={z}')
-                await self.add_command(GenericMoveCommand(x, y, z))
-                return True
-            except (json.JSONDecodeError, ValueError, KeyError) as e:
-                logger.error(f'Failed to parse velocity JSON: {e}, defaulting to stop')
-                await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
-                return True
+        commands = command_text.split(', ')
         # Check for specific simple commands
         # TODO: Implement if statements for the pupper commands. "move" is done for you as an example.
-        elif "move" in command_text:
-            logger.info('Queueing command: Move forward')
-            await self.add_command(KarelMethodCommand('move_forward', 'move forward', duration=1.5))
-            return True
-        elif "wiggle" in command_text or "dance" in command_text:
-            logger.info('Queueing command: Wiggle')
-            # Wiggle takes ~5 seconds in the karel API, add buffer
-            await self.add_command(KarelMethodCommand('wiggle', 'wiggle', duration=6.0))
-            return True
-        elif "bark" in command_text:
-            logger.info('Queueing command: Bark')
-            # Bark plays audio, give it time to complete
-            await self.add_command(KarelMethodCommand('bark', 'bark', duration=2.0))
-            return True
-        elif "stop" in command_text:
-            logger.info('Queueing command: Stop')
-            await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
-            return True
-        else:
-            logger.info('No specific robot command found, defaulting to stop')
-            await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
-            return True
+        for command in commands():
+            if command == "move_forward":
+                logger.info('Queueing command: Move forward')
+                await self.add_command(KarelMethodCommand('move_forward', 'move forward', duration=1.5))
+                return True
+            elif command == "wiggle":
+                logger.info('Queueing command: Wiggle')
+                # Wiggle takes ~5 seconds in the karel API, add buffer
+                await self.add_command(KarelMethodCommand('wiggle', 'wiggle', duration=6.0))
+                return True
+            elif command == "wiggle":
+                logger.info('Queueing command: Bark')
+                # Bark plays audio, give it time to complete
+                await self.add_command(KarelMethodCommand('bark', 'bark', duration=2.0))
+                return True
+            elif command == "wiggle":
+                logger.info('Queueing command: Stop')
+                await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
+                return True
+            elif "move(" in command:
+                velocities = command.split('(')[1].split(')')[0].split(',')
+                linear_x = velocites[0] 
+                linear_y = velocities[1]
+                angular_z = velocites[2]
+                logger.info('Queueing command: Move')
+                await self.add_command(KarelMethodCommand('move', 'move', arguments = [linear_x, linear_y, angular_z], duration=1.5))
+                return True
+            else:
+                logger.info('No specific robot command found, defaulting to stop')
+                await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
+                return True
     
     def start_command_processor(self):
         """Start the background command queue processor."""
