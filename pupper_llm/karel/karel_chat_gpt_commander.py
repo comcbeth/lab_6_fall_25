@@ -405,7 +405,7 @@ class EnhancedGPTCommanderNode(Node):
             Don't worry about making this prompt too long - the TA version is 50 lines!
             """
             # Enhanced system prompt for better command recognition
-            system_prompt = """You are Pupper....... <complete the rest!>"""
+            system_prompt = """You are Pupper. Move forward. Move Backward. Move Left. Move Right. Turn Left. Turn Right. Bark. Wiggle. Stop. Move forward quickly. Move backward quickly. Move left quickly. Move right quickly. Turn left quickly. Turn right quickly. Move forward slowly. Move backward slowly. Move left slowly. Move right slowly. Turn left slowly. Turn right slowly."""
             
             messages = [{"role": "system", "content": system_prompt}] + self.conversation_history
             
@@ -512,6 +512,14 @@ class EnhancedGPTCommanderNode(Node):
         """Queue a single robot command. Returns True if command was queued."""
         # First check if there's a JSON velocity specification
         import re
+
+        speed_multiplier = 1.0
+        if "quickly" in command_text:
+            speed_multiplier = 0.7
+        elif "slowly" in command_text:
+            speed_multiplier = 1.5
+        base_duration = 1.5
+
         json_match = re.search(r'move\s*(\{[^}]+\})', command_text)
         
         if json_match:
@@ -531,18 +539,36 @@ class EnhancedGPTCommanderNode(Node):
                 return True
         # Check for specific simple commands
         # TODO: Implement if statements for the pupper commands. "move" is done for you as an example.
+        elif "move backward" in command_text:
+            logger.info('Queueing command: Move backward')
+            await self.add_command(KarelMethodCommand('move_backward', 'move backward', duration=base_duration * speed_multiplier))
+            return True
+        elif "move left" in command_text:
+            logger.info('Queueing command: Move left')
+            await self.add_command(KarelMethodCommand('move_left', 'move left', duration=base_duration * speed_multiplier))
+            return True
+        elif "move right" in command_text:
+            logger.info('Queueing command: Move right')
+            await self.add_command(KarelMethodCommand('move_right', 'move right', duration=base_duration * speed_multiplier))
+            return True
+        elif "turn left" in command_text:
+            logger.info('Queueing command: Turn left')
+            await self.add_command(KarelMethodCommand('turn_left', 'turn left', duration=base_duration * speed_multiplier))
+            return True
+        elif "turn right" in command_text:
+            logger.info('Queueing command: Turn right')
+            await self.add_command(KarelMethodCommand('turn_right', 'turn right', duration=base_duration * speed_multiplier))
+            return True
         elif "move" in command_text:
             logger.info('Queueing command: Move forward')
-            await self.add_command(KarelMethodCommand('move_forward', 'move forward', duration=1.5))
+            await self.add_command(KarelMethodCommand('move_forward', 'move forward', duration=base_duration * speed_multiplier))
             return True
         elif "wiggle" in command_text or "dance" in command_text:
             logger.info('Queueing command: Wiggle')
-            # Wiggle takes ~5 seconds in the karel API, add buffer
             await self.add_command(KarelMethodCommand('wiggle', 'wiggle', duration=6.0))
             return True
         elif "bark" in command_text:
             logger.info('Queueing command: Bark')
-            # Bark plays audio, give it time to complete
             await self.add_command(KarelMethodCommand('bark', 'bark', duration=2.0))
             return True
         elif "stop" in command_text:
