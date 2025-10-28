@@ -486,68 +486,63 @@ class EnhancedGPTCommanderNode(Node):
     
     def _split_commands(self, commands_text: str) -> list:
         """Split command text by commas, but preserve JSON objects."""
-        commands = []
-        current = ""
-        depth = 0
-        
-        for char in commands_text:
-            if char == '{':
-                depth += 1
-                current += char
-            elif char == '}':
-                depth -= 1
-                current += char
-            elif char == ',' and depth == 0:
-                # Only split on commas outside of JSON objects
-                if current.strip():
-                    commands.append(current.strip())
-                current = ""
-            else:
-                current += char
-        
-        # Add the last command
-        if current.strip():
-            commands.append(current.strip())
+        commands = command_text.split(', ')
         
         return commands
     
     async def _queue_single_command(self, command_text: str) -> bool:
         """Queue a single robot command. Returns True if command was queued."""
         
-        commands = command_text.split(', ')
-        # Check for specific simple commands
-        # TODO: Implement if statements for the pupper commands. "move" is done for you as an example.
-        for command in commands():
-            if command == "move_forward":
-                logger.info('Queueing command: Move forward')
-                await self.add_command(KarelMethodCommand('move_forward', 'move forward', duration=1.5))
-                return True
-            elif command == "wiggle":
-                logger.info('Queueing command: Wiggle')
-                # Wiggle takes ~5 seconds in the karel API, add buffer
-                await self.add_command(KarelMethodCommand('wiggle', 'wiggle', duration=6.0))
-                return True
-            elif command == "wiggle":
-                logger.info('Queueing command: Bark')
-                # Bark plays audio, give it time to complete
-                await self.add_command(KarelMethodCommand('bark', 'bark', duration=2.0))
-                return True
-            elif command == "wiggle":
-                logger.info('Queueing command: Stop')
-                await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
-                return True
-            elif "move(" in command:
-                velocities = command.split('(')[1].split(')')[0].split(',')
-                linear_x = velocites[0] 
-                linear_y = velocities[1]
-                angular_z = velocites[2]
-                logger.info('Queueing command: Move')
-                await self.add_command(KarelMethodCommand('move', 'move', arguments = [linear_x, linear_y, angular_z], duration=1.5))
-                return True
-            else:
-                logger.info('No specific robot command found, defaulting to stop')
-                await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
-                return True
+        if command_text == "move_forward":
+            logger.info('Queueing command: Move forward')
+            await self.add_command(KarelMethodCommand('move_forward', 'move forward', duration=1.5))
+            return True
+        elif command_text == "move_backward":
+            logger.info('Queueing command: Move backward')
+            await self.add_command(KarelMethodCommand('move_backward', 'move backward', duration=1.5))
+            return True
+        elif command_text == "move_left":
+            logger.info('Queueing command: Move left')
+            await self.add_command(KarelMethodCommand('move_left', 'move left', duration=1.5))
+            return True
+        elif command_text == "move_right":
+            logger.info('Queueing command: Move right')
+            await self.add_command(KarelMethodCommand('move_right', 'move right', duration=1.5))
+            return True
+        elif command_text == "turn_left":
+            logger.info('Queueing command: Turn left')
+            await self.add_command(KarelMethodCommand('turn_left', 'move left', duration=1.5))
+            return True
+        elif command_text == "turn_right":
+            logger.info('Queueing command: Turn right')
+            await self.add_command(KarelMethodCommand('turn_right', 'move right', duration=1.5))
+            return True
+        elif command_text == "wiggle":
+            logger.info('Queueing command: Wiggle')
+            # Wiggle takes ~5 seconds in the karel API, add buffer
+            await self.add_command(KarelMethodCommand('wiggle', 'wiggle', duration=6.0))
+            return True
+        elif command_text == "bark":
+            logger.info('Queueing command: Bark')
+            # Bark plays audio, give it time to complete
+            await self.add_command(KarelMethodCommand('bark', 'bark', duration=2.0))
+            return True
+        elif command_text == "stop":
+            logger.info('Queueing command: Stop')
+            await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
+            return True
+        elif "move(" in command:
+            velocities = command.split('(')[1].split(')')[0].split(',')
+            linear_x = velocites[0] 
+            linear_y = velocities[1]
+            angular_z = velocites[2]
+            logger.info('Queueing command: Move')
+            await self.add_command(KarelMethodCommand('move', 'move', arguments = [linear_x, linear_y, angular_z], duration=1.5))
+            return True
+        else:
+            logger.info('No specific robot command found, defaulting to stop')
+            await self.add_command(KarelMethodCommand('stop', 'stop', duration=0.5))
+            return True
     
     def start_command_processor(self):
         """Start the background command queue processor."""
